@@ -6,7 +6,7 @@ use uuid::Uuid;
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
-    name: String
+    name: String,
 }
 
 pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> HttpResponse {

@@ -1,24 +1,20 @@
+use sqlx::PgPool;
+use std::net::TcpListener;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::run;
-use std::net::TcpListener;
-use sqlx::PgPool;
-
 
 pub struct TestApp {
     pub address: String,
-    pub db_pool: PgPool
+    pub db_pool: PgPool,
 }
 
 async fn spawn_app() -> TestApp {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .expect("Failed to bind random port!");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port!");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
 
     let configuration = get_configuration().expect("Failed to read configuration.");
-    let connection_pool = PgPool::connect(
-            &configuration.database.connection_string()
-        )
+    let connection_pool = PgPool::connect(&configuration.database.connection_string())
         .await
         .expect("Failed to connect to Postgres.");
 
@@ -27,15 +23,15 @@ async fn spawn_app() -> TestApp {
 
     TestApp {
         address,
-        db_pool: connection_pool
-    }    
+        db_pool: connection_pool,
+    }
 }
 
 #[tokio::test]
 async fn health_check_works() {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
-    
+
     let response = client
         .get(&format!("{}/health_check", &app.address))
         .send()
@@ -68,7 +64,6 @@ async fn subscribe_returns_200_for_valid_data() {
         .expect("Failed to fetch saved subscription");
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-
 }
 
 #[tokio::test]
@@ -78,7 +73,7 @@ async fn subscribe_returns_400_when_data_is_missing() {
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
         ("email=ursula_le_guin%40gmail.com", "missing the name"),
-        ("", "missing both name and email")
+        ("", "missing both name and email"),
     ];
 
     for (invalid_body, error_message) in test_cases {
