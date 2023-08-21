@@ -1,7 +1,9 @@
 use secrecy::{ExposeSecret, Secret};
 use serde_aux::field_attributes::deserialize_number_from_string;
-use sqlx::postgres::PgConnectOptions;
-
+use sqlx::{
+    postgres::{PgConnectOptions, PgSslMode},
+    ConnectOptions,
+};
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
@@ -17,6 +19,7 @@ pub struct DatabaseSettings {
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    pub require_ssl: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -28,15 +31,22 @@ pub struct ApplicationSettings {
 
 impl DatabaseSettings {
     pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
         PgConnectOptions::new()
             .host(&self.host)
             .username(&self.username)
             .password(&self.password.expose_secret())
             .port(self.port)
+            .ssl_mode(ssl_mode)
     }
 
     pub fn with_db(&self) -> PgConnectOptions {
-        self.without_db().database(&self.database_name)
+        let db_options = self.without_db().database(&self.database_name);
+        db_options.log_statements(tracing_log::log::LevelFilter::Trace)
     }
 }
 
@@ -69,8 +79,7 @@ impl TryFrom<String> for Environment {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    let base_path = std::env::current_dir()
-        .expect("Failed to determine the current directory");
+    let base_path = std::env::current_dir().expect("Failed to determine the current directory");
     let config_dir = base_path.join("configuration");
 
     let environment: Environment = std::env::var("APP_ENVIRONMENT")
@@ -80,18 +89,14 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     let config_filename = format!("{}.yaml", environment.as_str());
 
     let settings = config::Config::builder()
-        .add_source(
-            config::File::from(config_dir.join("base.yaml"))
-        )
-        .add_source(
-            config::File::from(config_dir.join(config_filename))
-        )
+        .add_source(config::File::from(config_dir.join("base.yaml")))
+        .add_source(config::File::from(config_dir.join(config_filename)))
         .add_source(
             // env variable APP_APPLICATION__PORT=5001 would set
             // `Settings.application.port` = 5001
             config::Environment::with_prefix("APP")
                 .prefix_separator("_")
-                .separator("__")
+                .separator("__"),
         )
         .build()?;
 
