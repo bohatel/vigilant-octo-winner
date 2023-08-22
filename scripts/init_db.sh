@@ -25,31 +25,36 @@ DB_PORT="${POSTGRES_PORT:=5435}"
 
 export PGPASSWORD="${DB_PASSWORD}"
 
-if [ "$(docker ps -aq -f name=${CONTAINER_NAME})" ]; then
-    >&2 echo "Postgres container already running"
-    if psql -h "${DB_HOST}" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; then
-        >&2 echo "Postgres is up and running on port ${DB_PORT}!"
+if [[ -z "${SKIP_DOCKER}" ]]
+then
+    if [ "$(docker ps -aq -f name=${CONTAINER_NAME})" ]; then
+        >&2 echo "Postgres container already running"
     else
-        >&2 echo "Connot connect to Postgres!"
+        docker run \
+            --name ${CONTAINER_NAME} \
+            -e POSTGRES_USER=${DB_USER} \
+            -e POSTGRES_PASSWORD=${DB_PASSWORD} \
+            -e POSTGRES_DB=${DB_NAME} \
+            -p "${DB_PORT}":5432 \
+            -d postgres \
+            postgres -N 1000
+    fi
+fi
+
+# Keep pinging Postgres until it's ready to accept commands
+i=0
+until psql -h "${DB_HOST}" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
+    >&2 echo "Postgres is still unavailable - sleeping"
+    if [[ $i -lt 15 ]]
+    then
+          ((i=i+1))
+          sleep 1
+    else
+        >&2 echo "Giving up on Postgres! It did not respond in ${i} seconds"
         exit 1
     fi
-else
-    docker run \
-        --name ${CONTAINER_NAME} \
-        -e POSTGRES_USER=${DB_USER} \
-        -e POSTGRES_PASSWORD=${DB_PASSWORD} \
-        -e POSTGRES_DB=${DB_NAME} \
-        -p "${DB_PORT}":5432 \
-        -d postgres \
-        postgres -N 1000
-
-    # Keep pinging Postgres until it's ready to accept commands
-    until psql -h "${DB_HOST}" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
-        >&2 echo "Postgres is still unavailable - sleeping"
-        sleep 1
-    done
-    >&2 echo "Postgres is up and running on port ${DB_PORT}!"
-fi
+done
+>&2 echo "Postgres is up and running on port ${DB_PORT}!"
 
 DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
 export DATABASE_URL
