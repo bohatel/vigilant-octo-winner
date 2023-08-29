@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: z2p-app
+  labels:
+    app: zero2prod
+spec:
+  template:
+    spec:
+      containers:
+      - name: zero2prod
+        image: 192.168.68.8:5000/zero2prod
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                  - amd64

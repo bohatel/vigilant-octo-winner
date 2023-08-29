@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: zero2prod
+data:
+  APP_DATABASE__REQUIRE_SSL: "false"
+  APP_DATABASE__PORT: "5432"
+  APP_DATABASE__HOST: dev-postgres-z2p

@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: z2p-app
+  labels:
+    app: zero2prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zero2prod
+  template:
+    metadata:
+      labels:
+        app: zero2prod
+    spec:
+      containers:
+      - name: zero2prod
+        image: zero2prod
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 8000
+          name: z2p-app
+        envFrom:
+        - configMapRef:
+            name: app-config

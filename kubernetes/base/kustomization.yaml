@@ -1,0 +1,9 @@
+kind: Kustomization
+
+resources:
+  - postgres-config.yaml
+  - postgres-statefulset.yaml
+  - postgres-service.yaml
+  - app-config.yaml
+  - app-deployment.yaml
+  - app-service.yaml

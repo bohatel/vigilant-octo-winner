@@ -1,0 +1,8 @@
+namespace: zero2prod
+namePrefix: dev-
+bases:
+  - ../base
+patchesStrategicMerge:
+  - app-deployment.yaml
+  - app-config.yaml
+  - app-service.yaml

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  labels:
+    app: postgres-z2p
+data:
+  POSTGRES_DB: newsletter
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: password

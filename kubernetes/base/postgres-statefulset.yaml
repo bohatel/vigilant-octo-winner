@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-z2p
+  labels:
+    app: postgres-z2p
+spec:
+  selector:
+    matchLabels:
+      app: postgres-z2p
+  serviceName: "postgres-z2p"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres-z2p
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        ports:
+        - containerPort: 5432
+          name: postgres-z2p
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: postgres-z2p-pvc
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-z2p-pvc
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi
