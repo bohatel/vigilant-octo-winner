@@ -1,17 +1,17 @@
 use secrecy::{ExposeSecret, Secret};
-use serde_aux::field_attributes::deserialize_number_from_string;
+use serde_aux::field_attributes::{deserialize_number_from_string, deserialize_bool_from_anything};
 use sqlx::{
     postgres::{PgConnectOptions, PgSslMode},
     ConnectOptions,
 };
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: Secret<String>,
@@ -19,10 +19,11 @@ pub struct DatabaseSettings {
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    #[serde(deserialize_with = "deserialize_bool_from_anything")]
     pub require_ssl: bool,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,

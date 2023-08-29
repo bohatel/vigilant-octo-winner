@@ -10,6 +10,9 @@ async fn main() -> Result<(), std::io::Error> {
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration!");
+
+    tracing::info!("Starting app with configuration: {:?}", configuration);
+
     let connection_pool = PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(5))
         .connect_lazy_with(configuration.database.with_db());
