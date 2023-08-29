@@ -1,5 +1,5 @@
 use secrecy::{ExposeSecret, Secret};
-use serde_aux::field_attributes::{deserialize_number_from_string, deserialize_bool_from_anything};
+use serde_aux::field_attributes::{deserialize_bool_from_anything, deserialize_number_from_string};
 use sqlx::{
     postgres::{PgConnectOptions, PgSslMode},
     ConnectOptions,
