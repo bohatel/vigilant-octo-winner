@@ -39,3 +39,4 @@ proptest = "1.2.0"
 wiremock = "0.5.19"
 tokio = { version = "1.29.1", features = ["rt", "macros"] }
 serde_json = "1.0.107"
+linkify = "0.10.0"
