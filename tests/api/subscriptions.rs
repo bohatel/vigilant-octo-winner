@@ -1,18 +1,10 @@
-use crate::helpers::spawn_app;
-use wiremock::matchers::{method, path};
-use wiremock::{Mock, ResponseTemplate};
+use crate::helpers::{setup_with_mock, spawn_app};
 use zero2prod::domain::SubscriberState;
 
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_data() {
-    let app = spawn_app().await;
+    let app = setup_with_mock().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
 
     let response = app.post_subscriptions(body.into()).await;
 
@@ -42,46 +34,22 @@ async fn subscribe_returns_400_when_data_is_missing_or_invalid() {
 
 #[tokio::test]
 async fn subscribe_sends_a_confirmation_email_with_a_link() {
-    let app = spawn_app().await;
+    let app = setup_with_mock().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&app.email_server)
-        .await;
 
     app.post_subscriptions(body.into()).await;
 
     // get the first request from the Mock server
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
-    let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-    let get_link = |s: &str| {
-        let links: Vec<_> = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect();
-        assert_eq!(links.len(), 1);
-        links[0].as_str().to_owned()
-    };
+    let confirmation_links = app.get_confirmation_links(&email_request);
 
-    let html_link = get_link(&body["HtmlBody"].as_str().unwrap());
-    let text_link = get_link(&body["TextBody"].as_str().unwrap());
-
-    assert_eq!(html_link, text_link);
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 }
 
 #[tokio::test]
 async fn subscribe_persists_the_new_subscriber() {
-    let app = spawn_app().await;
+    let app = setup_with_mock().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-    Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
 
     app.post_subscriptions(body.into()).await;
 
