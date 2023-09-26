@@ -3,7 +3,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName, SubscriberState};
 use crate::email_client::EmailClient;
 
 #[derive(serde::Deserialize)]
@@ -84,12 +84,13 @@ pub async fn insert_subscriber(
     sqlx::query!(
         r#"
     INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-    VALUES ($1, $2, $3, $4, 'pending_confirmation')
+    VALUES ($1, $2, $3, $4, $5)
         "#,
         Uuid::new_v4(),
         new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
-        Utc::now()
+        Utc::now(),
+        SubscriberState::Pending.as_str()
     )
     .execute(db_pool)
     .await

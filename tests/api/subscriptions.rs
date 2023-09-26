@@ -1,6 +1,7 @@
 use crate::helpers::spawn_app;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
+use zero2prod::domain::SubscriberState;
 
 #[tokio::test]
 async fn subscribe_returns_200_for_valid_data() {
@@ -91,5 +92,7 @@ async fn subscribe_persists_the_new_subscriber() {
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-    assert_eq!(saved.status, "pending_confirmation");
+
+    let status: SubscriberState = saved.status.try_into().unwrap();
+    assert_eq!(status, SubscriberState::Pending);
 }
