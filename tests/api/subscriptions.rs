@@ -81,3 +81,26 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() {
 
     assert_eq!(response.status().as_u16(), 500);
 }
+
+#[tokio::test]
+async fn subscriber_subscribes_twice_receives_2_emails() {
+    let app = setup_with_mock().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    app.post_subscriptions(body.into()).await;
+
+    // get the first request from the Mock server
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let confirmation_links = app.get_confirmation_links(&email_request);
+
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
+
+    app.post_subscriptions(body.into()).await;
+
+    // get the second request from the Mock server
+    let email_request = &app.email_server.received_requests().await.unwrap();
+    assert_eq!(email_request.len(), 2);
+    let confirmation_links = app.get_confirmation_links(&email_request[1]);
+
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
+}

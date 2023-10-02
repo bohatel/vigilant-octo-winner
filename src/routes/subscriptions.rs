@@ -26,6 +26,11 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
+struct SubscriberSatus {
+    id: Uuid,
+    status: SubscriberState,
+}
+
 #[tracing::instrument(
     name = "Adding new subscriber",
     skip(form, db_pool, email_client, base_url),
@@ -46,9 +51,31 @@ pub async fn subscribe(
         .begin()
         .await
         .context("Failed to acquire a Postgres connection from the pool")?;
-    let subscriber_id = insert_subscriber(&mut transaction, &new_subscriber)
-        .await
-        .context("Failed to insert new subscriber in the database.")?;
+    let mut temporary_id = insert_subscriber(&mut transaction, &new_subscriber).await;
+    if temporary_id.is_err() {
+        temporary_id =
+            match get_subscriber_id_from_email(&db_pool, new_subscriber.email.as_ref()).await {
+                Some(r) => {
+                    match r.status {
+                        SubscriberState::Active => return Ok(HttpResponse::Ok().finish()),
+                        _other => {
+                            let _ = transaction.rollback().await;
+                            transaction = db_pool
+                                .begin()
+                                .await
+                                .context("Failed to acquire a Postgres connection from the pool")?;
+                            set_subscriber_pending(&mut transaction, r.id)
+                                .await
+                                .context("Failed to update subscriber status")?;
+                        }
+                    }
+                    Ok(r.id)
+                }
+                None => temporary_id,
+            }
+    }
+    let subscriber_id = temporary_id.context("Failed to insert new subscriber in the database.")?;
+
     let subscription_token = generate_subscription_token();
     save_token(&mut transaction, subscriber_id, &subscription_token)
         .await
@@ -119,6 +146,26 @@ pub async fn insert_subscriber(
 }
 
 #[tracing::instrument(
+    name = "Updating subscriber status to pending_confirmation",
+    skip(subscriber_id, transaction)
+)]
+pub async fn set_subscriber_pending(
+    transaction: &mut Transaction<'_, Postgres>,
+    subscriber_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    let query = sqlx::query!(
+        r#"
+    UPDATE subscriptions set status = $1
+    WHERE id = $2
+        "#,
+        SubscriberState::Pending.as_str(),
+        subscriber_id,
+    );
+    transaction.execute(query).await?;
+    Ok(())
+}
+
+#[tracing::instrument(
     name = "Saving subscribtion token in the database",
     skip(transaction, subscriber_id, subscription_token)
 )]
@@ -143,4 +190,28 @@ fn generate_subscription_token() -> String {
         .map(char::from)
         .take(30)
         .collect()
+}
+
+// We should only call this is insert fails and don't need to bouble up errors
+#[tracing::instrument(name = "Find subscriber by email", skip(subscriber_email, db_pool))]
+async fn get_subscriber_id_from_email(
+    db_pool: &PgPool,
+    subscriber_email: &str,
+) -> Option<SubscriberSatus> {
+    match sqlx::query!(
+        "SELECT id, status FROM subscriptions WHERE email = $1",
+        subscriber_email,
+    )
+    .fetch_optional(db_pool)
+    .await
+    {
+        Ok(result) => result.map(|r| {
+            let status = r.status.try_into().unwrap_or(SubscriberState::Disabled);
+            SubscriberSatus { id: r.id, status }
+        }),
+        Err(e) => {
+            tracing::error!("Failed to query subscriber by email: {:?}", e);
+            None
+        }
+    }
 }

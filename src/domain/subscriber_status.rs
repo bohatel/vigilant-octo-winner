@@ -5,7 +5,6 @@ pub enum SubscriberState {
     Active,
     Pending,
     Disabled,
-    Deleted,
 }
 
 impl SubscriberState {
@@ -14,7 +13,6 @@ impl SubscriberState {
             SubscriberState::Active => "active",
             SubscriberState::Pending => "pending_confirmation",
             SubscriberState::Disabled => "disabled",
-            SubscriberState::Deleted => "deleted",
         }
     }
 }
@@ -27,7 +25,6 @@ impl TryFrom<String> for SubscriberState {
             "active" => Ok(Self::Active),
             "pending_confirmation" => Ok(Self::Pending),
             "disabled" => Ok(Self::Disabled),
-            "deleted" => Ok(Self::Deleted),
             other => Err(format!("Unknown subscriber status: {other}")),
         }
     }
