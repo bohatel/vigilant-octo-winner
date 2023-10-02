@@ -1,5 +1,7 @@
 use crate::domain::SubscriberState;
+use crate::routes::errors::ConfirmationError;
 use actix_web::{web, HttpResponse};
+use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -12,25 +14,23 @@ pub struct Parameters {
     name = "Confirm a pending subscription"
     skip(_params, db_pool)
 )]
-pub async fn confirm(_params: web::Query<Parameters>, db_pool: web::Data<PgPool>) -> HttpResponse {
-    let id = match get_subscriber_id_from_token(&db_pool, &_params.subscription_token).await {
-        Ok(id) => id,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
+pub async fn confirm(
+    _params: web::Query<Parameters>,
+    db_pool: web::Data<PgPool>,
+) -> Result<HttpResponse, ConfirmationError> {
+    let subscriber_id = get_subscriber_id_from_token(&db_pool, &_params.subscription_token)
+        .await
+        .context("Failed to retrieve the subscriber associated with the provided token.")?
+        .ok_or(ConfirmationError::UnknownToken)?;
 
-    match id {
-        None => HttpResponse::InternalServerError().finish(),
-        Some(subscriber_id) => {
-            if confirm_subscriber(&db_pool, subscriber_id).await.is_err() {
-                return HttpResponse::InternalServerError().finish();
-            }
-            HttpResponse::Ok().finish()
-        }
-    }
+    confirm_subscriber(&db_pool, subscriber_id)
+        .await
+        .context("Failed to confirm the subscription.")?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(
-    name = "Confirm a pending subscription"
+    name = "Get subscriber id from token"
     skip(db_pool, subscription_token)
 )]
 pub async fn get_subscriber_id_from_token(
@@ -43,11 +43,7 @@ pub async fn get_subscriber_id_from_token(
         subscription_token,
     )
     .fetch_optional(db_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(result.map(|r| r.subscriber_id))
 }
 
@@ -59,10 +55,6 @@ pub async fn confirm_subscriber(db_pool: &PgPool, subscriber_id: Uuid) -> Result
         subscriber_id,
     )
     .execute(db_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
     Ok(())
 }

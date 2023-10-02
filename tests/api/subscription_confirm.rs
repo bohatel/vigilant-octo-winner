@@ -77,3 +77,26 @@ async fn active_subscriber_does_not_receive_email() {
     let email_request = &app.email_server.received_requests().await.unwrap();
     assert_eq!(email_request.len(), 1);
 }
+
+#[tokio::test]
+async fn confirmation_with_nonexzisting_token_return_401() {
+    let app = setup_with_mock().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    app.post_subscriptions(body.into()).await;
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let confirmation_links = app.get_confirmation_links(&email_request);
+
+    let token = confirmation_links.html.query_pairs().next().unwrap().1;
+    sqlx::query!(
+        "DELETE from subscription_tokens WHERE subscription_token = $1",
+        &token
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to delete token");
+
+    let response = reqwest::get(confirmation_links.html).await.unwrap();
+
+    assert_eq!(response.status().as_u16(), 401);
+}
