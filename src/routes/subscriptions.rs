@@ -1,12 +1,12 @@
-use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName, SubscriberState};
+use crate::domain::{
+    NewSubscriber, SubscriberEmail, SubscriberName, SubscriberState, SubscriptionToken,
+};
 use crate::email_client::EmailClient;
 use crate::routes::errors::{StoreTokenError, SubscribeError};
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{web, HttpResponse};
 use anyhow::Context;
 use chrono::Utc;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -76,8 +76,8 @@ pub async fn subscribe(
     }
     let subscriber_id = temporary_id.context("Failed to insert new subscriber in the database.")?;
 
-    let subscription_token = generate_subscription_token();
-    save_token(&mut transaction, subscriber_id, &subscription_token)
+    let subscription_token = SubscriptionToken::generate();
+    save_token(&mut transaction, subscriber_id, subscription_token.as_ref())
         .await
         .context("Failed to store the confirmation token for a new subscriber.")?;
     transaction
@@ -88,7 +88,7 @@ pub async fn subscribe(
         &email_client,
         new_subscriber,
         &base_url.0,
-        &subscription_token,
+        subscription_token.as_ref(),
     )
     .await
     .context("Failed to send a confirmation email.")?;
@@ -182,14 +182,6 @@ pub async fn save_token(
     );
     transaction.execute(query).await.map_err(StoreTokenError)?;
     Ok(())
-}
-
-fn generate_subscription_token() -> String {
-    let mut rng = thread_rng();
-    std::iter::repeat_with(|| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(30)
-        .collect()
 }
 
 // We should only call this is insert fails and don't need to bouble up errors

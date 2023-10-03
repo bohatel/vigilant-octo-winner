@@ -79,7 +79,7 @@ async fn active_subscriber_does_not_receive_email() {
 }
 
 #[tokio::test]
-async fn confirmation_with_nonexzisting_token_return_401() {
+async fn confirmation_with_nonexisting_token_return_401() {
     let app = setup_with_mock().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
@@ -99,4 +99,23 @@ async fn confirmation_with_nonexzisting_token_return_401() {
     let response = reqwest::get(confirmation_links.html).await.unwrap();
 
     assert_eq!(response.status().as_u16(), 401);
+}
+
+#[tokio::test]
+async fn confirmation_with_bad_token_return_400() {
+    let app = setup_with_mock().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    app.post_subscriptions(body.into()).await;
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let confirmation_links = app.get_confirmation_links(&email_request);
+
+    let mut url = confirmation_links.html.clone();
+    url.query_pairs_mut().clear();
+    url.query_pairs_mut()
+        .append_pair("subscription_token", "TdBMIE4nBbp43AY1YDTr5XrCw6R15=");
+
+    let response = reqwest::get(url).await.unwrap();
+
+    assert_eq!(response.status().as_u16(), 400);
 }

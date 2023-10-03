@@ -62,6 +62,8 @@ impl ResponseError for SubscribeError {
 
 #[derive(thiserror::Error)]
 pub enum ConfirmationError {
+    #[error("{0}")]
+    ValidationError(String),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
     #[error("There is no subscriber associated with the provided token.")]
@@ -79,6 +81,7 @@ impl ResponseError for ConfirmationError {
         match self {
             ConfirmationError::UnknownToken => StatusCode::UNAUTHORIZED,
             ConfirmationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ConfirmationError::ValidationError(_) => StatusCode::BAD_REQUEST,
         }
     }
 }

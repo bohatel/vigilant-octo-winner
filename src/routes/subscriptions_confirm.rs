@@ -1,4 +1,4 @@
-use crate::domain::SubscriberState;
+use crate::domain::{SubscriberState, SubscriptionToken};
 use crate::routes::errors::ConfirmationError;
 use actix_web::{web, HttpResponse};
 use anyhow::Context;
@@ -18,7 +18,10 @@ pub async fn confirm(
     _params: web::Query<Parameters>,
     db_pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ConfirmationError> {
-    let subscriber_id = get_subscriber_id_from_token(&db_pool, &_params.subscription_token)
+    let subscription_token = SubscriptionToken::parse(_params.subscription_token.clone())
+        .map_err(ConfirmationError::ValidationError)?;
+
+    let subscriber_id = get_subscriber_id_from_token(&db_pool, subscription_token.as_ref())
         .await
         .context("Failed to retrieve the subscriber associated with the provided token.")?
         .ok_or(ConfirmationError::UnknownToken)?;
