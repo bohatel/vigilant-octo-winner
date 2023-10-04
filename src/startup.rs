@@ -4,10 +4,24 @@ use crate::routes::{confirm, health_check, subscribe};
 
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
+use once_cell::sync::Lazy;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
+use tera::Tera;
 use tracing_actix_web::TracingLogger;
+
+pub static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
+    let mut tera = match Tera::new("templates/**/*") {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("Templates parsing error(s): {}", e);
+            ::std::process::exit(1);
+        }
+    };
+    tera.autoescape_on(vec![".html", ".sql"]);
+    tera
+});
 
 pub struct Application {
     port: u16,

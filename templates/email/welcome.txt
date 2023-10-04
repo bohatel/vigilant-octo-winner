@@ -1,0 +1,3 @@
+Welcome to our newsletter!
+
+Visit {{ confirmation_link | safe }} to confirm your subscription.

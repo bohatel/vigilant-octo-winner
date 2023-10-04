@@ -3,7 +3,7 @@ use crate::domain::{
 };
 use crate::email_client::EmailClient;
 use crate::routes::errors::{StoreTokenError, SubscribeError};
-use crate::startup::ApplicationBaseUrl;
+use crate::startup::{ApplicationBaseUrl, TEMPLATES};
 use actix_web::{web, HttpResponse};
 use anyhow::Context;
 use chrono::Utc;
@@ -105,20 +105,25 @@ pub async fn send_confirmation_email(
     new_subscriber: NewSubscriber,
     base_url: &str,
     subscription_token: &str,
-) -> Result<(), reqwest::Error> {
+) -> Result<(), SubscribeError> {
     let confirmation_link =
         format!("{base_url}/subscriptions/confirm?subscription_token={subscription_token}");
-    let plain_body = format!(
-        "Welcome to our newsletter!\nVisit {confirmation_link} to confirm your subscription."
-    );
-    let html_body = format!(
-        "Welcome to our newsletter!<br />\
-        Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription."
-    );
+    let mut context = tera::Context::new();
+    context.insert("confirmation_link", &confirmation_link);
+
+    let plain_body = TEMPLATES
+        .render("email/welcome.txt", &context)
+        .context("Failed to parse plain text template")?;
+    let html_body = TEMPLATES
+        .render("email/welcome.html", &context)
+        .context("Failed to parse plain text template")?;
 
     email_client
         .send_email(new_subscriber.email, "Welcome!", &html_body, &plain_body)
         .await
+        .context("Failed to send email.")?;
+
+    Ok(())
 }
 
 #[tracing::instrument(
